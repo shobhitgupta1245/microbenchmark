@@ -1,4 +1,4 @@
-package com.shobhitsg.benchmark;
+package com.microbenchmark.benchmark;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;

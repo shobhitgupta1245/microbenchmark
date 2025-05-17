@@ -1,10 +1,11 @@
-package com.shobhitsg.benchmark;
+package com.microbenchmark.benchmark;
 
-import com.shobhitsg.config.DatabaseConfig;
-import com.shobhitsg.metrics.MetricsService;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.microbenchmark.config.DatabaseConfig;
+import com.microbenchmark.metrics.MetricsService;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -13,7 +14,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class BatchStatementExecutor {

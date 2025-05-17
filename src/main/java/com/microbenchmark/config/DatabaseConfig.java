@@ -1,4 +1,4 @@
-package com.shobhitsg.config;
+package com.microbenchmark.config;
 
 import java.sql.Connection;
 import java.sql.SQLException;

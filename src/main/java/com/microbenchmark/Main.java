@@ -1,12 +1,13 @@
-package com.shobhitsg;
+package com.microbenchmark;
 
-import com.shobhitsg.benchmark.BatchStatementExecutor;
-import com.shobhitsg.benchmark.ComplexQueryProvider;
-import com.shobhitsg.benchmark.QueryProvider;
-import com.shobhitsg.config.ConfigurationLoader;
-import com.shobhitsg.config.DatabaseConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.microbenchmark.benchmark.BatchStatementExecutor;
+import com.microbenchmark.benchmark.ComplexQueryProvider;
+import com.microbenchmark.benchmark.QueryProvider;
+import com.microbenchmark.config.ConfigurationLoader;
+import com.microbenchmark.config.DatabaseConfig;
 
 import java.time.Duration;
 import java.util.Arrays;

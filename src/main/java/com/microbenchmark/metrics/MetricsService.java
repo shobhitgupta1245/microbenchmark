@@ -1,4 +1,4 @@
-package com.shobhitsg.metrics;
+package com.microbenchmark.metrics;
 
 import io.micrometer.core.instrument.*;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
