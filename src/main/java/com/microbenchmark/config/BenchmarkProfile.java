@@ -1,25 +1,27 @@
 package com.microbenchmark.config;
 
-public enum BenchmarkProfile {
-    SPANNER("spanner"),
-    POSTGRES("postgres");
+import java.time.Duration;
 
-    private final String value;
+public class BenchmarkProfile {
+    private final int batchSize;
+    private final int totalOperations;
+    private final Duration maxDuration;
 
-    BenchmarkProfile(String value) {
-        this.value = value;
+    public BenchmarkProfile(int batchSize, int totalOperations, Duration maxDuration) {
+        this.batchSize = batchSize;
+        this.totalOperations = totalOperations;
+        this.maxDuration = maxDuration;
     }
 
-    public String getValue() {
-        return value;
+    public int getBatchSize() {
+        return batchSize;
     }
 
-    public static BenchmarkProfile fromString(String profile) {
-        for (BenchmarkProfile bp : values()) {
-            if (bp.value.equalsIgnoreCase(profile)) {
-                return bp;
-            }
-        }
-        throw new IllegalArgumentException("Unknown profile: " + profile + ". Valid profiles are: spanner, postgres");
+    public int getTotalOperations() {
+        return totalOperations;
+    }
+
+    public Duration getMaxDuration() {
+        return maxDuration;
     }
 } 

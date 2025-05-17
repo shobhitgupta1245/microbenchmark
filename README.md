@@ -19,6 +19,7 @@ A comprehensive benchmarking system to compare Cloud Spanner JDBC with PostgreSQ
   - Success/failure tracking
 - Multi-threaded execution (automatically scales based on available processors)
 - Profile-based execution (run either Spanner or PostgreSQL benchmarks)
+- Google Cloud Monitoring integration for real-time metrics visualization
 
 ## Prerequisites
 
@@ -27,6 +28,7 @@ A comprehensive benchmarking system to compare Cloud Spanner JDBC with PostgreSQ
 - PostgreSQL
 - Cloud Spanner instance
 - pgAdapter (for PostgreSQL testing)
+- Google Cloud project with Monitoring API enabled (optional)
 
 ## Configuration
 
@@ -41,6 +43,11 @@ A comprehensive benchmarking system to compare Cloud Spanner JDBC with PostgreSQ
    - database
    - username
    - password
+
+3. (Optional) Configure Google Cloud Monitoring in `src/main/resources/monitoring.properties`:
+   - google.cloud.project.id: Your Google Cloud project ID
+   - metrics.reporting.interval.seconds: Metrics reporting frequency (default: 60)
+   - metrics.enabled: Enable/disable Cloud Monitoring (default: true)
 
 ## Building
 
@@ -86,4 +93,33 @@ Both database configurations include performance tuning parameters in their resp
 
 ## Timeout Configuration
 
-The benchmark has a default timeout of 30 minutes. If your benchmarks need more time, you can modify the `DEFAULT_TIMEOUT_MINUTES` constant in the `Main` class. 
+The benchmark has a default timeout of 30 minutes. If your benchmarks need more time, you can modify the `DEFAULT_TIMEOUT_MINUTES` constant in the `Main` class.
+
+## Metrics
+
+### Local Metrics
+The benchmark provides detailed local metrics including:
+- Operation counts and failure rates
+- Latency percentiles (P50, P75, P90, P95, P99)
+- Throughput per batch size
+- Overall throughput and timing statistics
+
+### Google Cloud Monitoring
+When configured, the benchmark automatically publishes metrics to Google Cloud Monitoring:
+1. Enable the Cloud Monitoring API in your Google Cloud project
+2. Configure your project ID in `monitoring.properties`
+3. Ensure you have appropriate permissions (Monitoring Metric Writer role)
+4. View metrics in the Google Cloud Console under Monitoring > Metrics Explorer
+
+Available Cloud Metrics:
+- `operations.total`: Total operations processed
+- `operations.failed`: Failed operations count
+- `batch.execution`: Batch execution timing with percentiles
+- `batch.count`: Number of batches by size
+- `query.execution`: Individual query execution timing
+
+All metrics are tagged with:
+- `database`: The database type (spanner/postgres)
+- `application`: "microbenchmark"
+- `batch_size`: For batch-related metrics
+- `type`: For query-specific metrics 

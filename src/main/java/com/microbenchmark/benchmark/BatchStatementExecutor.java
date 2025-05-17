@@ -1,11 +1,10 @@
 package com.microbenchmark.benchmark;
 
-import io.micrometer.core.instrument.Timer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.microbenchmark.config.BenchmarkProfile;
 import com.microbenchmark.config.DatabaseConfig;
 import com.microbenchmark.metrics.MetricsService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -14,119 +13,69 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.UUID;
 
 public class BatchStatementExecutor {
     private static final Logger logger = LoggerFactory.getLogger(BatchStatementExecutor.class);
-    private final DatabaseConfig dbConfig;
-    private final QueryProvider queryProvider;
-    private final List<BenchmarkListener> listeners;
-    private final AtomicLong operationsCompleted;
+    private final DatabaseConfig databaseConfig;
+    private final BenchmarkProfile profile;
     private final MetricsService metricsService;
-    private final Timer batchInsertTimer;
 
-    public BatchStatementExecutor(DatabaseConfig dbConfig, QueryProvider queryProvider, String databaseType) {
-        this.dbConfig = dbConfig;
-        this.queryProvider = queryProvider;
-        this.listeners = new ArrayList<>();
-        this.operationsCompleted = new AtomicLong(0);
-        this.metricsService = new MetricsService(databaseType);
-        this.batchInsertTimer = metricsService.getQueryTimer("batch_insert");
+    public BatchStatementExecutor(DatabaseConfig databaseConfig, BenchmarkProfile profile, MetricsService metricsService) {
+        this.databaseConfig = databaseConfig;
+        this.profile = profile;
+        this.metricsService = metricsService;
     }
 
-    public void addListener(BenchmarkListener listener) {
-        listeners.add(listener);
-    }
+    public void execute() {
+        try (Connection conn = databaseConfig.createConnection()) {
+            String insertUserSql = "INSERT INTO users (id, name, email, status, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+            String insertOrderSql = "INSERT INTO orders (id, user_id, order_status, total_amount, items_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
 
-    public BenchmarkResult execute() {
-        Instant start = Instant.now();
-        long totalOperations = queryProvider.getTotalOperations();
-        int batchSize = queryProvider.getBatchSize();
-        long totalBatches = (totalOperations + batchSize - 1) / batchSize;
+            int batchSize = profile.getBatchSize();
+            int totalOperations = profile.getTotalOperations();
+            Duration maxDuration = profile.getMaxDuration();
+            Instant startTime = Instant.now();
 
-        try (Connection conn = dbConfig.createConnection()) {
-            conn.setAutoCommit(false);
-            try (PreparedStatement stmt = conn.prepareStatement(queryProvider.getSql())) {
-                for (long batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-                    Instant batchStart = Instant.now();
-                    int statementsInBatch = 0;
-                    try {
-                        statementsInBatch = executeBatch(stmt, batchIndex, batchSize, totalOperations);
-                        conn.commit();
+            List<String> userIds = new ArrayList<>();
+            try (PreparedStatement userStmt = conn.prepareStatement(insertUserSql);
+                 PreparedStatement orderStmt = conn.prepareStatement(insertOrderSql)) {
+
+                for (int i = 0; i < totalOperations && Duration.between(startTime, Instant.now()).compareTo(maxDuration) < 0; i++) {
+                    String userId = UUID.randomUUID().toString();
+                    userIds.add(userId);
+
+                    // Insert user
+                    userStmt.setString(1, userId);
+                    userStmt.setString(2, "User " + i);
+                    userStmt.setString(3, "user" + i + "@example.com");
+                    userStmt.setString(4, "ACTIVE");
+                    userStmt.addBatch();
+
+                    // Insert order
+                    orderStmt.setString(1, UUID.randomUUID().toString());
+                    orderStmt.setString(2, userId);
+                    orderStmt.setString(3, "PENDING");
+                    orderStmt.setDouble(4, 100.0 + i);
+                    orderStmt.setInt(5, i % 10 + 1);
+                    orderStmt.addBatch();
+
+                    if ((i + 1) % batchSize == 0) {
+                        Instant batchStart = Instant.now();
+                        userStmt.executeBatch();
+                        orderStmt.executeBatch();
                         Duration batchDuration = Duration.between(batchStart, Instant.now());
-                        metricsService.recordBatchExecution(batchDuration, statementsInBatch);
-                    } catch (SQLException e) {
-                        conn.rollback();
-                        metricsService.incrementFailedOperations();
-                        throw e;
+                        metricsService.recordBatchExecution(batchSize, batchDuration);
                     }
-                    
-                    // Notify progress
-                    long completed = operationsCompleted.get();
-                    double progress = (double) completed / totalOperations;
-                    notifyProgress(progress, completed, totalOperations);
                 }
+
+                // Execute any remaining statements
+                userStmt.executeBatch();
+                orderStmt.executeBatch();
             }
         } catch (SQLException e) {
             logger.error("Error executing batch statements", e);
             throw new RuntimeException("Batch execution failed", e);
-        }
-
-        Duration duration = Duration.between(start, Instant.now());
-        metricsService.printMetrics();
-        return new BenchmarkResult(totalOperations, duration);
-    }
-
-    private int executeBatch(PreparedStatement stmt, long batchIndex, int batchSize, long totalOperations) 
-            throws SQLException {
-        Timer.Sample batchSample = Timer.start();
-        try {
-            // For VariableBatchQueryProvider, this will add multiple statements to the batch
-            queryProvider.setParameters(stmt, batchIndex);
-            
-            int[] results = stmt.executeBatch();
-            long successCount = 0;
-            for (int result : results) {
-                if (result >= 0) successCount++;
-            }
-            operationsCompleted.addAndGet(successCount);
-            metricsService.incrementTotalOperations(successCount);
-            
-            return results.length; // Return the actual number of statements in this batch
-        } finally {
-            batchSample.stop(batchInsertTimer);
-        }
-    }
-
-    private void notifyProgress(double progress, long completed, long total) {
-        for (BenchmarkListener listener : listeners) {
-            listener.onProgress(progress, completed, total);
-        }
-    }
-
-    public interface BenchmarkListener {
-        void onProgress(double progress, long completed, long total);
-    }
-
-    public static class BenchmarkResult {
-        private final long totalOperations;
-        private final Duration duration;
-
-        public BenchmarkResult(long totalOperations, Duration duration) {
-            this.totalOperations = totalOperations;
-            this.duration = duration;
-        }
-
-        public long getTotalOperations() {
-            return totalOperations;
-        }
-
-        public Duration getDuration() {
-            return duration;
-        }
-
-        public double getOperationsPerSecond() {
-            return totalOperations / (duration.toMillis() / 1000.0);
         }
     }
 } 

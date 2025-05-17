@@ -18,6 +18,7 @@
         <junit.version>5.10.2</junit.version>
         <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
         <micrometer.version>1.15.0</micrometer.version>
+        <testcontainers.version>1.19.7</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -65,6 +66,36 @@
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Google Cloud Monitoring -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-stackdriver</artifactId>
+            <version>1.15.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-monitoring</artifactId>
+            <version>3.35.0</version>
         </dependency>
     </dependencies>
 
