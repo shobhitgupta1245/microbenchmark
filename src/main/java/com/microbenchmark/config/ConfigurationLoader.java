@@ -1,14 +1,10 @@
 package com.microbenchmark.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
 public class ConfigurationLoader {
-    private static final Logger logger = LoggerFactory.getLogger(ConfigurationLoader.class);
     private static final String CONFIG_FILE = "config.properties";
 
     public static Properties loadConfig() {
@@ -30,7 +26,8 @@ public class ConfigurationLoader {
             config.getProperty("spanner.instance.id"),
             config.getProperty("spanner.database.id"),
             config.getProperty("spanner.host", "localhost"),
-            Integer.parseInt(config.getProperty("spanner.port", "9010"))
+            Integer.parseInt(config.getProperty("spanner.port", "9010")),
+            SpannerConnectionType.JDBC_DIRECT  // Default to direct JDBC
         );
     }
 

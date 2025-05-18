@@ -12,34 +12,41 @@
         <maven.compiler.source>18</maven.compiler.source>
         <maven.compiler.target>18</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <log4j2.version>2.24.3</log4j2.version>
         <spanner.version>2.30.1</spanner.version>
-        <postgres.version>42.7.5</postgres.version>
-        <junit.version>5.10.2</junit.version>
-        <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
-        <micrometer.version>1.15.0</micrometer.version>
+        <postgresql.version>42.7.5</postgresql.version>
         <testcontainers.version>1.19.7</testcontainers.version>
+        <micrometer.version>1.15.0</micrometer.version>
+        <junit.version>5.10.2</junit.version>
+        <log4j.version>2.24.3</log4j.version>
+        <slf4j.version>2.0.12</slf4j.version>
     </properties>
 
     <dependencies>
-        <!-- Spanner JDBC -->
+        <!-- Google Cloud Spanner -->
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-spanner-jdbc</artifactId>
             <version>${spanner.version}</version>
         </dependency>
 
-        <!-- PostgreSQL JDBC -->
+        <!-- PostgreSQL JDBC Driver -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>${postgres.version}</version>
+            <version>${postgresql.version}</version>
         </dependency>
 
-        <!-- Metrics -->
+        <!-- Micrometer Core -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
+            <version>${micrometer.version}</version>
+        </dependency>
+
+        <!-- Micrometer Registry for Google Cloud Monitoring -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-stackdriver</artifactId>
             <version>${micrometer.version}</version>
         </dependency>
 
@@ -47,20 +54,25 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
-            <version>${log4j2.version}</version>
+            <version>${log4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>${log4j2.version}</version>
+            <version>${log4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j2-impl</artifactId>
-            <version>${log4j2.version}</version>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
         </dependency>
 
-        <!-- Testing -->
+        <!-- Test Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -85,18 +97,6 @@
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
-
-        <!-- Google Cloud Monitoring -->
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-registry-stackdriver</artifactId>
-            <version>1.15.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.cloud</groupId>
-            <artifactId>google-cloud-monitoring</artifactId>
-            <version>3.35.0</version>
-        </dependency>
     </dependencies>
 
     <build>
@@ -104,11 +104,15 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven.compiler.plugin.version}</version>
+                <version>3.14.0</version>
                 <configuration>
-                    <source>${maven.compiler.source}</source>
-                    <target>${maven.compiler.target}</target>
+                    <release>18</release>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
             </plugin>
         </plugins>
     </build>

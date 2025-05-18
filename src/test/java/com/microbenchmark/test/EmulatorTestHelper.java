@@ -1,104 +1,98 @@
 package com.microbenchmark.test;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.Statement;
 import java.util.Properties;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class EmulatorTestHelper {
-    private static final Logger logger = LoggerFactory.getLogger(EmulatorTestHelper.class);
-    private static final String POSTGRES_SCHEMA_FILE = "schema.sql";
+public class EmulatorTestHelper implements AutoCloseable {
     private static final String SPANNER_SCHEMA_FILE = "spanner-schema.sql";
     private static final int SPANNER_PORT = 9010;
     private static final int PGADAPTER_PORT = 5432;
     private static final int REST_PORT = 9020;
+    private static final String DOCKER_IMAGE = "gcr.io/cloud-spanner-pg-adapter/pgadapter-emulator";
     
-    private PostgreSQLContainer<?> postgresContainer;
-    private GenericContainer<?> spannerEmulator;
+    private GenericContainer<?> emulatorContainer;
     private Properties testConfig;
     private final HttpClient httpClient;
 
     public EmulatorTestHelper() {
-        loadTestConfig();
         this.httpClient = HttpClient.newHttpClient();
     }
 
-    private void loadTestConfig() {
-        testConfig = new Properties();
-        try {
-            testConfig.load(getClass().getClassLoader().getResourceAsStream("test-config.properties"));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load test configuration", e);
-        }
-    }
-
-    public void startPostgres() {
-        postgresContainer = new PostgreSQLContainer<>(DockerImageName.parse("postgres:14-alpine"))
-            .withDatabaseName(testConfig.getProperty("postgres.test.database"))
-            .withUsername(testConfig.getProperty("postgres.test.username"))
-            .withPassword(testConfig.getProperty("postgres.test.password"));
-        
-        postgresContainer.start();
-        initializePostgresSchema();
-    }
-
     public void startSpannerEmulator() {
-        spannerEmulator = new GenericContainer<>(DockerImageName.parse("gcr.io/cloud-spanner-emulator/emulator:latest"))
-            .withExposedPorts(SPANNER_PORT, PGADAPTER_PORT, REST_PORT)
-            .withEnv("SPANNER_PROJECT", testConfig.getProperty("spanner.emulator.project"))
-            .withEnv("SPANNER_INSTANCE", testConfig.getProperty("spanner.emulator.instance"))
-            // Enable pgAdapter with specific configuration
-            .withEnv("ENABLE_PGADAPTER", "true")
-            .withEnv("PGADAPTER_PORT", String.valueOf(PGADAPTER_PORT))
-            .withEnv("PGADAPTER_ENABLE_AUTOCOMMIT", "true")
-            .withEnv("PGADAPTER_ENABLE_IAM_AUTH", "false")
-            .withEnv("PGADAPTER_ENABLE_SSL", "false")
-            .withEnv("PGADAPTER_LISTEN_ADDRESSES", "*")
-            // Configure REST and gRPC ports
-            .withEnv("REST_PORT", String.valueOf(REST_PORT))
-            .withEnv("GRPC_PORT", String.valueOf(SPANNER_PORT));
-        
-        spannerEmulator.start();
+        // Initialize test configuration first
+        testConfig = new Properties();
+        testConfig.setProperty("spanner.emulator.project", "test-project");
+        testConfig.setProperty("spanner.emulator.instance", "test-instance");
+        testConfig.setProperty("spanner.emulator.database", "test-database");
+        testConfig.setProperty("test.batch.size", "10");
+        testConfig.setProperty("test.total.operations", "100");
+        testConfig.setProperty("test.duration.minutes", "1");
+        testConfig.setProperty("metrics.enabled", "false");
 
-        // Wait a bit longer for the emulator to be fully ready
+        // Start container with all required ports
+        emulatorContainer = new GenericContainer<>(DockerImageName.parse(DOCKER_IMAGE));
+        emulatorContainer.addExposedPort(SPANNER_PORT);
+        emulatorContainer.addExposedPort(PGADAPTER_PORT);
+        emulatorContainer.addExposedPort(REST_PORT);
+        emulatorContainer.setWaitStrategy(Wait.forListeningPorts(PGADAPTER_PORT));
+        emulatorContainer.start();
+
+        // Wait for the emulator to be fully ready
         try {
-            Thread.sleep(5000);
+            Thread.sleep(10000); // Wait 10 seconds for the emulator to stabilize
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
 
+        // Verify REST endpoint is accessible before proceeding
+        verifyRestEndpoint();
+
+        // Initialize schema after container is ready
         initializeSpannerSchema();
     }
 
-    private void initializePostgresSchema() {
+    private void verifyRestEndpoint() {
+        String restEndpoint = String.format("http://%s:%d",
+            emulatorContainer.getHost(),
+            emulatorContainer.getMappedPort(REST_PORT));
+
+        HttpRequest healthCheck = HttpRequest.newBuilder()
+            .uri(URI.create(restEndpoint))
+            .GET()
+            .build();
+
         try {
-            String jdbcUrl = postgresContainer.getJdbcUrl();
-            String username = postgresContainer.getUsername();
-            String password = postgresContainer.getPassword();
-            
-            try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
-                 Statement stmt = conn.createStatement()) {
-                String schema = Files.readString(Path.of("src/main/resources/" + POSTGRES_SCHEMA_FILE));
-                stmt.execute(schema);
+            int maxRetries = 5;
+            int retryCount = 0;
+            boolean isHealthy = false;
+
+            while (!isHealthy && retryCount < maxRetries) {
+                try {
+                    HttpResponse<String> response = httpClient.send(healthCheck, HttpResponse.BodyHandlers.ofString());
+                    isHealthy = response.statusCode() == 200;
+                } catch (Exception e) {
+                    Thread.sleep(2000); // Wait 2 seconds before retry
+                }
+                retryCount++;
+            }
+
+            if (!isHealthy) {
+                throw new RuntimeException("REST endpoint failed to become available");
             }
         } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize PostgreSQL schema", e);
+            throw new RuntimeException("Failed to verify REST endpoint", e);
         }
     }
 
@@ -113,12 +107,9 @@ public class EmulatorTestHelper {
 
     private void initializeSpannerSchema() {
         try {
-            // Wait for the emulator to be ready
-            Thread.sleep(2000);
-
             String restEndpoint = String.format("http://%s:%d",
-                spannerEmulator.getHost(),
-                spannerEmulator.getMappedPort(REST_PORT));
+                emulatorContainer.getHost(),
+                emulatorContainer.getMappedPort(REST_PORT));
 
             // Create instance
             String createInstanceUrl = String.format("%s/v1/projects/%s/instances",
@@ -140,6 +131,7 @@ public class EmulatorTestHelper {
                 testConfig.getProperty("spanner.emulator.instance"),
                 testConfig.getProperty("spanner.emulator.instance"));
 
+        
             HttpRequest createInstanceRequest = HttpRequest.newBuilder()
                 .uri(URI.create(createInstanceUrl))
                 .header("Content-Type", "application/json")
@@ -152,6 +144,10 @@ public class EmulatorTestHelper {
             if (instanceResponse.statusCode() != 200 && instanceResponse.statusCode() != 409) {
                 throw new RuntimeException("Failed to create instance: " + instanceResponse.body());
             }
+            
+
+            // Wait after instance creation
+            Thread.sleep(2000);
 
             // Create database
             String createDatabaseUrl = String.format("%s/v1/projects/%s/instances/%s/databases",
@@ -185,42 +181,38 @@ public class EmulatorTestHelper {
                 throw new RuntimeException("Failed to create database: " + databaseResponse.body());
             }
 
+            // Wait after database creation
+            Thread.sleep(2000);
+
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize Spanner emulator", e);
         }
     }
 
-    public void stopAll() {
-        if (postgresContainer != null) {
-            postgresContainer.stop();
+    @Override
+    public void close() {
+        if (emulatorContainer != null) {
+            emulatorContainer.stop();
         }
-        if (spannerEmulator != null) {
-            spannerEmulator.stop();
+        if (httpClient instanceof AutoCloseable) {
+            try {
+                ((AutoCloseable) httpClient).close();
+            } catch (Exception e) {
+                // Ignore
+            }
         }
-    }
-
-    public String getPostgresJdbcUrl() {
-        return postgresContainer != null ? postgresContainer.getJdbcUrl() : null;
-    }
-
-    public String getPostgresUsername() {
-        return postgresContainer != null ? postgresContainer.getUsername() : null;
-    }
-
-    public String getPostgresPassword() {
-        return postgresContainer != null ? postgresContainer.getPassword() : null;
     }
 
     public String getSpannerEmulatorHost() {
-        return spannerEmulator != null ? spannerEmulator.getHost() : null;
+        return emulatorContainer.getHost();
     }
 
-    public Integer getSpannerEmulatorPort() {
-        return spannerEmulator != null ? spannerEmulator.getMappedPort(SPANNER_PORT) : null;
+    public int getSpannerEmulatorPort() {
+        return emulatorContainer.getMappedPort(SPANNER_PORT);
     }
 
-    public Integer getPgAdapterPort() {
-        return spannerEmulator != null ? spannerEmulator.getMappedPort(PGADAPTER_PORT) : null;
+    public int getPgAdapterPort() {
+        return emulatorContainer.getMappedPort(PGADAPTER_PORT);
     }
 
     public Properties getTestConfig() {

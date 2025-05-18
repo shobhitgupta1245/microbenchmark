@@ -3,101 +3,89 @@ package com.microbenchmark.benchmark;
 import com.microbenchmark.config.BenchmarkProfile;
 import com.microbenchmark.config.DatabaseConfig;
 import com.microbenchmark.config.MonitoringConfig;
-import com.microbenchmark.config.PostgresConfig;
 import com.microbenchmark.config.SpannerConfig;
+import com.microbenchmark.config.SpannerConnectionType;
 import com.microbenchmark.metrics.MetricsService;
 import com.microbenchmark.test.EmulatorTestHelper;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class BenchmarkIntegrationTest {
-    private static final Logger logger = LoggerFactory.getLogger(BenchmarkIntegrationTest.class);
     private EmulatorTestHelper emulatorHelper;
     private Properties testConfig;
+    private MonitoringConfig monitoringConfig;
+    private MetricsService metricsService;
 
     @BeforeAll
     void setUp() {
         emulatorHelper = new EmulatorTestHelper();
-        testConfig = emulatorHelper.getTestConfig();
-        emulatorHelper.startPostgres();
         emulatorHelper.startSpannerEmulator();
+        testConfig = emulatorHelper.getTestConfig();
+
+        monitoringConfig = new MonitoringConfig(
+            Boolean.parseBoolean(testConfig.getProperty("metrics.enabled", "false")),
+            testConfig.getProperty("google.cloud.project.id", ""),
+            testConfig.getProperty("metrics.prefix", "test")
+        );
+
+        metricsService = new MetricsService(
+            monitoringConfig,
+            "test",
+            testConfig.getProperty("google.cloud.project.id", "")
+        );
     }
 
     @AfterAll
     void tearDown() {
-        emulatorHelper.stopAll();
+        if (emulatorHelper != null) {
+            emulatorHelper.close();
+        }
     }
 
     @Test
-    void testPostgresBenchmark() {
-        DatabaseConfig postgresConfig = new PostgresConfig(
-            emulatorHelper.getPostgresJdbcUrl(),
-            emulatorHelper.getPostgresUsername(),
-            emulatorHelper.getPostgresPassword()
-        );
-
-        MonitoringConfig monitoringConfig = new MonitoringConfig(false, null, null);
-        MetricsService metricsService = new MetricsService(
-            monitoringConfig,
-            "postgres",
-            testConfig.getProperty("spanner.emulator.project")
-        );
-
-        BenchmarkProfile profile = new BenchmarkProfile(
-            Integer.parseInt(testConfig.getProperty("test.batch.size")),
-            Integer.parseInt(testConfig.getProperty("test.total.operations")),
-            Duration.ofMinutes(Integer.parseInt(testConfig.getProperty("test.duration.minutes")))
-        );
-
-        BatchStatementExecutor executor = new BatchStatementExecutor(
-            postgresConfig,
-            profile,
-            metricsService
-        );
-
-        assertDoesNotThrow(() -> executor.execute());
-    }
-
-    @Test
-    void testSpannerBenchmark() {
-        DatabaseConfig spannerConfig = new SpannerConfig(
+    void testSpannerDirectJdbc() {
+        DatabaseConfig config = new SpannerConfig(
             testConfig.getProperty("spanner.emulator.project"),
             testConfig.getProperty("spanner.emulator.instance"),
             testConfig.getProperty("spanner.emulator.database"),
             emulatorHelper.getSpannerEmulatorHost(),
-            emulatorHelper.getPgAdapterPort()
+            emulatorHelper.getSpannerEmulatorPort(),
+            SpannerConnectionType.JDBC_DIRECT
         );
 
-        MonitoringConfig monitoringConfig = new MonitoringConfig(false, null, null);
-        MetricsService metricsService = new MetricsService(
-            monitoringConfig,
-            "spanner",
-            testConfig.getProperty("spanner.emulator.project")
+        runBenchmark(config);
+    }
+
+    @Test
+    void testSpannerPgAdapter() {
+        DatabaseConfig config = new SpannerConfig(
+            testConfig.getProperty("spanner.emulator.project"),
+            testConfig.getProperty("spanner.emulator.instance"),
+            testConfig.getProperty("spanner.emulator.database"),
+            emulatorHelper.getSpannerEmulatorHost(),
+            emulatorHelper.getPgAdapterPort(),
+            SpannerConnectionType.PGADAPTER_JDBC
         );
 
+        runBenchmark(config);
+    }
+
+    private void runBenchmark(DatabaseConfig config) {
         BenchmarkProfile profile = new BenchmarkProfile(
-            Integer.parseInt(testConfig.getProperty("test.batch.size")),
-            Integer.parseInt(testConfig.getProperty("test.total.operations")),
-            Duration.ofMinutes(Integer.parseInt(testConfig.getProperty("test.duration.minutes")))
+            Integer.parseInt(testConfig.getProperty("test.batch.size", "10")),
+            Integer.parseInt(testConfig.getProperty("test.total.operations", "100")),
+            Duration.ofMinutes(Integer.parseInt(testConfig.getProperty("test.duration.minutes", "1")))
         );
 
-        BatchStatementExecutor executor = new BatchStatementExecutor(
-            spannerConfig,
-            profile,
-            metricsService
-        );
-
+        BatchStatementExecutor executor = new BatchStatementExecutor(config, profile, metricsService);
         assertDoesNotThrow(() -> executor.execute());
     }
 } 

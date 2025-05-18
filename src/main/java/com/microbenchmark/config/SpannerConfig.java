@@ -11,42 +11,79 @@ public class SpannerConfig implements DatabaseConfig {
     private final String databaseId;
     private final String host;
     private final int port;
+    private final SpannerConnectionType connectionType;
 
-    public SpannerConfig(String projectId, String instanceId, String databaseId, String host, int port) {
+    public SpannerConfig(String projectId, String instanceId, String databaseId, 
+                        String host, int port, SpannerConnectionType connectionType) {
         this.projectId = projectId;
         this.instanceId = instanceId;
         this.databaseId = databaseId;
         this.host = host;
         this.port = port;
-    }
-
-    @Override
-    public String getJdbcUrl() {
-        // Use PostgreSQL JDBC URL format for pgAdapter with specific parameters
-        return String.format("jdbc:postgresql://%s:%d/%s?sslmode=disable&preferQueryMode=simple",
-            host, port, databaseId);
-    }
-
-    @Override
-    public String getUsername() {
-        return ""; // pgAdapter doesn't require username
-    }
-
-    @Override
-    public String getPassword() {
-        return ""; // pgAdapter doesn't require password
+        this.connectionType = connectionType;
     }
 
     @Override
     public Connection createConnection() throws SQLException {
+        String jdbcUrl;
         Properties props = new Properties();
-        props.setProperty("user", getUsername());
-        props.setProperty("password", getPassword());
-        props.setProperty("sslmode", "disable");
-        props.setProperty("preferQueryMode", "simple");
-        props.setProperty("socketTimeout", "30");
-        props.setProperty("connectTimeout", "30");
-        
-        return DriverManager.getConnection(getJdbcUrl(), props);
+
+        if (connectionType == SpannerConnectionType.JDBC_DIRECT) {
+            jdbcUrl = String.format("jdbc:cloudspanner://%s:%d/projects/%s/instances/%s/databases/%s",
+                host, port, projectId, instanceId, databaseId);
+            
+            // Set emulator-specific properties
+            props.setProperty("usePlainText", "true");
+            props.setProperty("autoConfigEmulator", "true");
+            props.setProperty("minSessions", "1");
+            props.setProperty("maxSessions", "4");
+        } else {
+            // PGAdapter connection
+            jdbcUrl = String.format("jdbc:postgresql://%s:%d/%s?options=-c%%20spanner.project_id=%s%%20-c%%20spanner.instance_id=%s%%20-c%%20spanner.database_id=%s",
+                host, port, databaseId, projectId, instanceId, databaseId);
+            
+            // Set PGAdapter-specific properties
+            props.setProperty("user", "postgres");
+            props.setProperty("password", "");
+            props.setProperty("socketTimeout", "30");
+            props.setProperty("tcpKeepAlive", "true");
+            props.setProperty("ssl", "false");
+            props.setProperty("sslmode", "disable");
+            props.setProperty("reWriteBatchedInserts", "true");
+            props.setProperty("prepareThreshold", "1");
+            props.setProperty("preparedStatementCacheQueries", "0");
+            props.setProperty("autosave", "never");
+            props.setProperty("binaryTransfer", "true");
+            props.setProperty("loginTimeout", "10");
+            props.setProperty("ApplicationName", "microbenchmark");
+            props.setProperty("preferQueryMode", "simple");
+        }
+
+        return DriverManager.getConnection(jdbcUrl, props);
+    }
+
+    @Override
+    public String getJdbcUrl() {
+        if (connectionType == SpannerConnectionType.JDBC_DIRECT) {
+            return String.format("jdbc:cloudspanner://%s:%d/projects/%s/instances/%s/databases/%s",
+                host, port, projectId, instanceId, databaseId);
+        } else {
+            return String.format("jdbc:postgresql://%s:%d/%s?options=-c%%20spanner.project_id=%s%%20-c%%20spanner.instance_id=%s%%20-c%%20spanner.database_id=%s",
+                host, port, databaseId, projectId, instanceId, databaseId);
+        }
+    }
+
+    @Override
+    public String getUsername() {
+        return connectionType == SpannerConnectionType.PGADAPTER_JDBC ? "postgres" : null;
+    }
+
+    @Override
+    public String getPassword() {
+        return connectionType == SpannerConnectionType.PGADAPTER_JDBC ? "" : null;
+    }
+
+    public SpannerConnectionType getConnectionType() {
+        return connectionType;
     }
 } 

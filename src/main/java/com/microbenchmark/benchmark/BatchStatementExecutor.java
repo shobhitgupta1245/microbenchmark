@@ -6,6 +6,8 @@ import com.microbenchmark.metrics.MetricsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -56,7 +58,7 @@ public class BatchStatementExecutor {
                     orderStmt.setString(1, UUID.randomUUID().toString());
                     orderStmt.setString(2, userId);
                     orderStmt.setString(3, "PENDING");
-                    orderStmt.setDouble(4, 100.0 + i);
+                    orderStmt.setBigDecimal(4, BigDecimal.valueOf(100.0 + i).setScale(2, RoundingMode.HALF_UP));
                     orderStmt.setInt(5, i % 10 + 1);
                     orderStmt.addBatch();
 

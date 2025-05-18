@@ -6,7 +6,7 @@ CREATE TABLE users (
     status STRING(20) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
-) PRIMARY KEY(id);
+) PRIMARY KEY (id);
 
 -- Orders table with foreign key to users
 CREATE TABLE orders (
@@ -18,7 +18,7 @@ CREATE TABLE orders (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     CONSTRAINT FK_orders_user_id FOREIGN KEY (user_id) REFERENCES users(id)
-) PRIMARY KEY(id);
+) PRIMARY KEY (id);
 
 -- Indexes for better performance
 CREATE INDEX idx_users_email ON users(email);
