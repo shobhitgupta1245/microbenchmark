@@ -37,10 +37,10 @@ public class ComplexQueryProvider implements QueryProvider {
         return switch (operationType) {
             case USER_INSERT -> "INSERT INTO users (id, name, email, status, created_at, updated_at) " +
                               "VALUES (?, ?, ?, ?, ?, ?)";
-            case ORDER_INSERT -> "INSERT INTO orders (id, user_id, order_status, total_amount, items_count, created_at, updated_at) " +
+            case ORDER_INSERT -> "INSERT INTO oorder (id, user_id, order_status, total_amount, items_count, created_at, updated_at) " +
                                "VALUES (?, ?, ?, ?, ?, ?, ?)";
             case USER_UPDATE -> "UPDATE users SET status = ?, updated_at = ? WHERE id = ?";
-            case ORDER_UPDATE -> "UPDATE orders SET order_status = ?, total_amount = ?, items_count = ?, updated_at = ? WHERE id = ?";
+            case ORDER_UPDATE -> "UPDATE oorder SET order_status = ?, total_amount = ?, items_count = ?, updated_at = ? WHERE id = ?";
             case MIXED -> throw new IllegalStateException("MIXED type requires multiple statements and cannot provide a single SQL");
         };
     }

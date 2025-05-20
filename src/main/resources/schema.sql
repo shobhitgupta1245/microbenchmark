@@ -4,19 +4,19 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
     status VARCHAR(20) NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL
 );
 
 -- Orders table with foreign key to users
-CREATE TABLE orders (
+CREATE TABLE oorder (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     order_status VARCHAR(20) NOT NULL,
-    total_amount DECIMAL(10,2) NOT NULL,
+    total_amount NUMERIC(10,2) NOT NULL,
     items_count INT NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 

@@ -5,7 +5,7 @@ import java.io.InputStream;
 import java.util.Properties;
 
 public class ConfigurationLoader {
-    private static final String CONFIG_FILE = "config.properties";
+    private static final String CONFIG_FILE = "spanner.properties";
 
     public static Properties loadConfig() {
         Properties props = new Properties();
@@ -22,11 +22,9 @@ public class ConfigurationLoader {
 
     public static DatabaseConfig createSpannerConfig(Properties config) {
         return new SpannerConfig(
-            config.getProperty("spanner.project.id"),
-            config.getProperty("spanner.instance.id"),
-            config.getProperty("spanner.database.id"),
-            config.getProperty("spanner.host", "localhost"),
-            Integer.parseInt(config.getProperty("spanner.port", "9010")),
+            config.getProperty("project.id"),
+            config.getProperty("instance.id"),
+            config.getProperty("database.id"),
             SpannerConnectionType.JDBC_DIRECT  // Default to direct JDBC
         );
     }

@@ -56,8 +56,6 @@ public class BenchmarkIntegrationTest {
             testConfig.getProperty("spanner.emulator.project"),
             testConfig.getProperty("spanner.emulator.instance"),
             testConfig.getProperty("spanner.emulator.database"),
-            emulatorHelper.getSpannerEmulatorHost(),
-            emulatorHelper.getSpannerEmulatorPort(),
             SpannerConnectionType.JDBC_DIRECT
         );
 
@@ -70,8 +68,6 @@ public class BenchmarkIntegrationTest {
             testConfig.getProperty("spanner.emulator.project"),
             testConfig.getProperty("spanner.emulator.instance"),
             testConfig.getProperty("spanner.emulator.database"),
-            emulatorHelper.getSpannerEmulatorHost(),
-            emulatorHelper.getPgAdapterPort(),
             SpannerConnectionType.PGADAPTER_JDBC
         );
 

@@ -9,17 +9,12 @@ public class SpannerConfig implements DatabaseConfig {
     private final String projectId;
     private final String instanceId;
     private final String databaseId;
-    private final String host;
-    private final int port;
     private final SpannerConnectionType connectionType;
 
-    public SpannerConfig(String projectId, String instanceId, String databaseId, 
-                        String host, int port, SpannerConnectionType connectionType) {
+    public SpannerConfig(String projectId, String instanceId, String databaseId, SpannerConnectionType connectionType) {
         this.projectId = projectId;
         this.instanceId = instanceId;
         this.databaseId = databaseId;
-        this.host = host;
-        this.port = port;
         this.connectionType = connectionType;
     }
 
@@ -29,18 +24,19 @@ public class SpannerConfig implements DatabaseConfig {
         Properties props = new Properties();
 
         if (connectionType == SpannerConnectionType.JDBC_DIRECT) {
-            jdbcUrl = String.format("jdbc:cloudspanner://%s:%d/projects/%s/instances/%s/databases/%s",
-                host, port, projectId, instanceId, databaseId);
+            jdbcUrl = String.format("jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s",
+                projectId, instanceId, databaseId);
             
             // Set emulator-specific properties
-            props.setProperty("usePlainText", "true");
-            props.setProperty("autoConfigEmulator", "true");
+            // props.setProperty("usePlainText", "true");
+            // props.setProperty("autoConfigEmulator", "true");
             props.setProperty("minSessions", "1");
             props.setProperty("maxSessions", "4");
+            props.setProperty("credentials", "/Users/shobhitgup/Downloads/span-cloud-testing.json");
         } else {
             // PGAdapter connection
-            jdbcUrl = String.format("jdbc:postgresql://%s:%d/%s?options=-c%%20spanner.project_id=%s%%20-c%%20spanner.instance_id=%s%%20-c%%20spanner.database_id=%s",
-                host, port, databaseId, projectId, instanceId, databaseId);
+            jdbcUrl = String.format("jdbc:postgresql://localhost:5432/%s?options=-c%%20spanner.project_id=%s%%20-c%%20spanner.instance_id=%s%%20-c%%20spanner.database_id=%s",
+                databaseId, projectId, instanceId, databaseId);
             
             // Set PGAdapter-specific properties
             props.setProperty("user", "postgres");
@@ -65,11 +61,11 @@ public class SpannerConfig implements DatabaseConfig {
     @Override
     public String getJdbcUrl() {
         if (connectionType == SpannerConnectionType.JDBC_DIRECT) {
-            return String.format("jdbc:cloudspanner://%s:%d/projects/%s/instances/%s/databases/%s",
-                host, port, projectId, instanceId, databaseId);
+            return String.format("jdbc:cloudspanner:/projects/%s/instances/%s/databases/%s",
+                projectId, instanceId, databaseId);
         } else {
-            return String.format("jdbc:postgresql://%s:%d/%s?options=-c%%20spanner.project_id=%s%%20-c%%20spanner.instance_id=%s%%20-c%%20spanner.database_id=%s",
-                host, port, databaseId, projectId, instanceId, databaseId);
+            return String.format("jdbc:postgresql://localhost:5432/%s?options=-c%%20spanner.project_id=%s%%20-c%%20spanner.instance_id=%s%%20-c%%20spanner.database_id=%s",
+                databaseId, projectId, instanceId, databaseId);
         }
     }
 
