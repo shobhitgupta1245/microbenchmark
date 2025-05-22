@@ -6,6 +6,7 @@ import com.microbenchmark.config.DatabaseConfig;
 import com.microbenchmark.config.MonitoringConfig;
 import com.microbenchmark.metrics.MetricsService;
 import com.microbenchmark.benchmark.BatchStatementExecutor;
+import com.microbenchmark.benchmark.ComplexQueryProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,17 +61,23 @@ public class Main {
                 Duration.ofMinutes(Integer.parseInt(config.getProperty("duration.minutes", "5")))
             );
 
+            // Create complex query provider with mixed operations
+            ComplexQueryProvider queryProvider = new ComplexQueryProvider(ComplexQueryProvider.OperationType.MIXED);
+
             // Create and run executor
             BatchStatementExecutor executor = new BatchStatementExecutor(
                 dbConfig,
                 benchmarkProfile,
-                metricsService
+                metricsService,
+                queryProvider
             );
 
+            logger.info("Starting benchmark with {} profile", profileName);
             executor.execute();
+            logger.info("Benchmark completed successfully");
 
         } catch (Exception e) {
-            logger.error("Error running benchmark", e);
+            logger.error("Benchmark failed", e);
             System.exit(1);
         }
     }

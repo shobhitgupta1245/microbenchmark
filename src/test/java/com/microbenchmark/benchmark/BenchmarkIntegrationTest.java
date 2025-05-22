@@ -81,7 +81,8 @@ public class BenchmarkIntegrationTest {
             Duration.ofMinutes(Integer.parseInt(testConfig.getProperty("test.duration.minutes", "1")))
         );
 
-        BatchStatementExecutor executor = new BatchStatementExecutor(config, profile, metricsService);
+        ComplexQueryProvider queryProvider = new ComplexQueryProvider(ComplexQueryProvider.OperationType.MIXED);
+        BatchStatementExecutor executor = new BatchStatementExecutor(config, profile, metricsService, queryProvider);
         assertDoesNotThrow(() -> executor.execute());
     }
 } 
